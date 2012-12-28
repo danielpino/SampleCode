@@ -1,4 +1,4 @@
-SampleCode
+Code Details
 ==========
 
 FizzBuzzBash is a simple test script designed to print a list of numbers or the text "Fizz", "Buzz", and/or "Bash" if the number is divisible by 3, 5, and/or 7 respectively.
