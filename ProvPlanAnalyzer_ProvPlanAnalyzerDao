@@ -1,0 +1,178 @@
+import java.sql.*;
+import java.util.*;
+import java.io.*;
+
+import org.apache.log4j.Logger;
+
+public class ProvPlanAnalyzerDao {
+  private static Logger logger = Logger.getLogger(ProvPlanAnalyzerDao.class);
+	private final static String KEY_FILE_PATH = "file.path";
+	private Connection connectionM6 = null;
+	
+    private DataSource dataSourceM6;
+    
+    private static final String SQL_GET_TASK_COUNT = 
+            "select pp.plan_id, pp.plan_name, count(task_type) " +
+            "from provisioning_plan_task ppt, provisioning_plan pp " +
+            "where ppt.plan_id = pp.plan_id " +
+            "and pp.plan_id in (select distinct(plan_id) " +
+            		"from provisioning_plan where active_ind = 'Y') " +
+            "group by pp.plan_id, pp.plan_name order by count(task_type) desc";
+
+    private static final String SQL_GET_ALL_TASKS = 
+        "select task_type from provisioning_plan_task where plan_id = ?";
+
+	public void countAllTasks (List<PlanObject> allPlans) {
+        PreparedStatement statement = null;
+        ResultSet resultset = null;
+        logger.info("Preparing and executing scripts.");
+        
+        try {
+            dataSourceM6 = new DataSource(DataSource.DS_M6);
+            connectionM6 = dataSourceM6.getConnection();
+            connectionM6.setAutoCommit(false);
+            
+            statement = connectionM6.prepareStatement(SQL_GET_TASK_COUNT);
+            logger.info(SQL_GET_TASK_COUNT);
+            resultset = statement.executeQuery();
+            
+            while (resultset.next()) {
+            	PlanObject plan = new PlanObject();
+            	plan.planID = resultset.getInt(1);
+            	plan.planName = resultset.getString(2);
+            	plan.count = resultset.getInt(3);
+                allPlans.add(plan);
+                //logger.info("Added planID: "+ plan.planID +" and count: "+ plan.count);
+            }
+                
+            resultset.close();
+            statement.close();
+
+            
+        } catch (Exception e) {
+                        e.printStackTrace();
+        }
+        dataSourceM6.close(statement);
+    }
+	
+	public void getAllTasks(List<PlanObject> allPlans) {
+		PreparedStatement statement = null;
+		ResultSet resultset = null;
+		logger.info("Preparing and executing scripts.");
+
+		try {
+			dataSourceM6 = new DataSource(DataSource.DS_M6);
+			connectionM6 = dataSourceM6.getConnection();
+			connectionM6.setAutoCommit(false);
+			
+			logger.info("running " +allPlans.size()+ " queries for task type");
+			for (int i = 0; i < allPlans.size(); i++) {
+				if (i%50 == 0){
+					logger.info("finished query " +i+ " of " +allPlans.size());
+				}
+				PlanObject plan = allPlans.get(i);
+				statement = connectionM6.prepareStatement(SQL_GET_ALL_TASKS);
+				statement.setInt(1, plan.planID);
+				
+				resultset = statement.executeQuery();
+
+				while (resultset.next()) {
+					plan.tasks.add(resultset.getString(1));
+				}
+
+				resultset.close();
+				statement.close();
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		dataSourceM6.close(statement);
+	}
+	
+	public void comparePlansIdentical (List<PlanObject> allPlans, List<MatchingPlans> samePlans){
+		
+		//get first plan
+		for (int i = 0; i < allPlans.size(); i++){
+			PlanObject startPlan = allPlans.get(i);
+			logger.info("first plan: " +startPlan.planID);
+			
+			//get second plan to compare
+			for (int j = i+1; j < allPlans.size(); j++){
+				PlanObject secondPlan = allPlans.get(j);
+				//logger.info("second plan: " +secondPlan.planID);
+				
+				//if number of tasks are the same in each plan
+				if (startPlan.count == secondPlan.count){
+					logger.info("counts are the same for plan " +secondPlan.planID);
+					boolean sameTasks = true;
+					//get first task from first plan
+					
+					for (int m = 0; m < startPlan.count; m++){
+						if (sameTasks == false){
+							logger.info("Because tasks not matched, breaking loop");
+						}
+						String startTask = startPlan.tasks.get(m);
+						logger.info("task is " +startTask);
+						
+						boolean foundTask = false;
+						
+						//get second task to compare
+						for (int n = 0; n < secondPlan.count; n++){
+							String secondTask = secondPlan.tasks.get(n);
+							//logger.info("Second task is " +secondTask);
+							//if tasks are the same, mark flag found
+							if (startTask.equalsIgnoreCase(secondTask)){
+								foundTask = true;
+								logger.info("Tasks matched, breaking loop");
+								break;
+							}
+						}
+						//if task not matched, mark flag false
+						if (foundTask == false){
+							sameTasks = false;
+							logger.info("***Tasks not matched. Plans not identical***");
+							break;
+						}
+					}
+					if (sameTasks == true){
+						MatchingPlans match = new MatchingPlans();
+						match.planID1 = startPlan.planID;
+						match.planID2 = secondPlan.planID;
+						match.planName1 = startPlan.planName;
+						match.planName2 = secondPlan.planName;
+						samePlans.add(match);
+						logger.info("Matched following plans: " +startPlan.planID+ " " +secondPlan.planID);
+					} else {
+						logger.info("Plans not matched: " +startPlan.planID+ " " +secondPlan.planID);
+					}
+					
+				} else {
+					//logger.info("counts are not the same");
+				}
+			}
+		}
+	}
+	
+	public void printSamePlans (List<MatchingPlans> samePlans){
+		long time = System.currentTimeMillis();
+		try {
+			logger.info("Attempting to write to ProvisioningPlan" +time+ ".csv");
+			FileWriter outFile = new FileWriter(AppUtil.getProperty(KEY_FILE_PATH) 
+					+ File.separator + "Output"+time+".csv");
+			PrintWriter out = new PrintWriter(outFile);
+			out.println("Plan1,Plan1Name,Plan2,Plan2Name");
+			for (int i =0; i<samePlans.size(); i++){
+				out.println(samePlans.get(i).planID1 + "," 
+						+ samePlans.get(i).planName1 + ","
+						+ samePlans.get(i).planID2 + "," 
+						+ samePlans.get(i).planName2);
+			}
+			out.close();
+	  } catch (IOException e){
+		  logger.info("Failed to write to ProvisioningPlan" +time+ ".csv");
+	  }
+	}
+	
+}
