@@ -1,0 +1,389 @@
+import java.sql.*;
+import java.util.*;
+import java.io.*;
+import org.apache.log4j.Logger;
+
+/**
+ * Provides methods for processing and analyzing log files
+ * @author dapino
+ */
+
+public class LogReaderDao {
+  private static Logger logger = Logger.getLogger(LogReaderDao.class);
+  private final static String KEY_FILE_PATH = "/export/home/m6read/loginfo";
+	private Connection connectionM6 = null;
+	
+    private DataSource dataSourceM6;
+    
+    /**
+     * SQL string for querying the task table for information
+     */
+    private static final String SQL_GET_TASK_INFO = ("" +
+            "Select document_number, task_type "+
+            "from task "+
+            "where task_number = ?");
+    
+    /**
+     * SQL string for querying the serv_req table for document numbers
+     */
+    private static final String SQL_GET_ORDER_INFO = ("" +
+            "Select max(document_number) "+
+            "from serv_req "+
+            "where pon = ?");
+    
+    /**
+     * Looks through a log file to find PONs, which are then stored in a list
+     * 
+     * @param logFile - the location and name of the log file
+     * @param orders - the full list of PONs returned
+     */
+	public void processOrderFile(String logFile, List<OrderObjects> orders) {
+		String tempLine;
+		try {
+			InputStreamReader reader = new InputStreamReader(new FileInputStream(logFile));
+	 		BufferedReader in = new BufferedReader(reader);
+
+			while ((tempLine = in.readLine()) != null)	{
+				String PON;
+				int index1 = tempLine.indexOf("<PON:");
+				int index2 = tempLine.indexOf(";>]");
+				if (index1 > 0 && index2 > 0){
+					String timeTemp = tempLine.substring(0, 19);
+					PON = tempLine.substring(index1 + 5, index2);
+					this.addOrderToList(orders, PON, timeTemp);
+				}
+			}
+		} catch (Exception e){
+			logger.error("Log Reader failed", e);
+		}
+	}
+    
+	/**
+	 * Looks through a log file to find task numbers, which are then stored in a list
+     * 
+     * @param logFile - the location and name of the log file
+     * @param orders - the full list of task numbers returned
+	 */
+	public void processTaskFile(String logFile, List<TaskObjects> tasks) {
+		String tempLine;
+		try {
+			InputStreamReader reader = new InputStreamReader(new FileInputStream(logFile));
+	 		BufferedReader in = new BufferedReader(reader);
+
+			while ((tempLine = in.readLine()) != null)	{
+				String taskNumber;
+				//Date time;
+				int index = tempLine.indexOf("TaskNumber:");
+				int index2 = tempLine.indexOf(";GatewayEventId");
+				if (index > 0){
+					String timeTemp = tempLine.substring(0, 19);
+					//time = this.getDate(timeTemp);
+					taskNumber = tempLine.substring(index + 11, index2);
+					this.addTaskToList(tasks, taskNumber, timeTemp);
+					//logger.info("task number: '" + taskNumber + "' has been added");
+				}
+			}
+		} catch (Exception e){
+			logger.error("Log Reader failed", e);
+		}
+	}
+
+	/**
+	 * Decides if PON is already in the list of orders. If not, adds the order to the list.
+	 * Updates the start and end time values for the order.
+	 * 
+	 * @param orders - full list of PONs already stored
+	 * @param nPON - current PON in question
+	 * @param nTime - time in the log that this PON was logged
+	 */
+	public void addOrderToList(List<OrderObjects> orders, String nPON, String nTime){
+		OrderObjects fullOrder;
+		
+		boolean PONFound = false;
+		for (int i = 0; i < orders.size(); i++){
+			fullOrder = orders.get(i);
+			if (fullOrder.getPON().equalsIgnoreCase(nPON)){
+				PONFound = true;
+				fullOrder.incrementTaskNumber();
+				fullOrder.setTimeEnd(nTime);
+				orders.set(i, fullOrder);
+				//logger.info("PON: '" + nPON + "' has been incremented");
+			}
+		}
+		
+		if (PONFound == false){
+			fullOrder = new OrderObjects(nPON);
+			fullOrder.setTimeEnd(nTime);
+			fullOrder.setTimeStart(nTime);
+			orders.add(fullOrder);
+			//logger.info("PON: '" + nPON + "' has been added");
+		}
+		
+	}
+	
+	/**
+	 * Decides if task number is already in the list of orders. If not, adds the 
+	 * task number to the list. Updates the start and end time values for the order.
+	 * 
+	 * @param orders - full list of task numbers already stored
+	 * @param nPON - current task number in question
+	 * @param nTime - time in the log that this task number was logged
+	 */
+	public void addTaskToList(List<TaskObjects> tasks, String nTaskNumber, String nTime){
+		TaskObjects fullTask;
+		int taskNumber = 0;
+		
+		try{
+			taskNumber = Integer.parseInt(nTaskNumber);
+		}
+		catch (Exception e){
+			logger.error("LogReaderDoa failed to convert TaskNumber to String: " +nTaskNumber, e);
+		}
+		
+		boolean taskNumberFound = false;
+		for (int i = 0; i < tasks.size(); i++){
+			fullTask = tasks.get(i);
+			if (fullTask.getTaskNumber() == taskNumber){
+				taskNumberFound = true;
+				fullTask.incrementTaskNumber();
+				fullTask.setTimeEnd(nTime);
+				tasks.set(i, fullTask);
+			}
+		}
+		
+		if (taskNumberFound == false){
+			fullTask = new TaskObjects(taskNumber);
+			fullTask.setTimeEnd(nTime);
+			fullTask.setTimeStart(nTime);
+			tasks.add(fullTask);
+		}
+		
+	}
+
+	/**
+	 * Queries the DB to find information on tasks. 
+	 * @param tasks
+	 * @param serverFlag - What server is being checked
+	 */
+	public void getTaskInfo (List<TaskObjects> tasks, String serverFlag) {
+        PreparedStatement statement = null;
+        ResultSet resultset = null;
+        TaskObjects fullTask;
+        int size = tasks.size();
+        long queryStart = System.currentTimeMillis();
+        
+		logger.info("Setting server flag and creating DataSource.");
+        try {
+        	if (serverFlag == "KH"){
+        		dataSourceM6 = new DataSource("KH");
+        		logger.info("Set Server to KH.");
+        	} else if (serverFlag == "INV"){
+        		dataSourceM6 = new DataSource("INV");  
+        		logger.info("Set Server to INV.");      		
+        	} else if (serverFlag == "CON"){
+        		dataSourceM6 = new DataSource("CON");  
+        		logger.info("Set Server to CON.");
+        	} else {
+        		logger.error("Could not relate the serverFlag to a server.");
+        		logger.error("The value being passed is: " +serverFlag);
+
+        		logger.error("Log Reader cannot continue and is exiting.");
+        		System.exit(0);
+        	}
+
+    		logger.info("Attempting to Connect to DB.");
+            connectionM6 = dataSourceM6.getConnection();
+            connectionM6.setAutoCommit(false);
+    		logger.info("Connected to DB.");
+
+    		logger.info("Beginning querying for task information.");
+            for (int i =0; i < tasks.size(); i++) {
+            	fullTask = tasks.get(i);
+                statement = connectionM6.prepareStatement(SQL_GET_TASK_INFO);
+                statement.setInt(1, fullTask.getTaskNumber());
+                //logger.info("Creating query with task_number: " +fullTask.getTaskNumber());
+                
+                resultset = statement.executeQuery();
+                //logger.info("after query "+i+"/"+size);
+                while (resultset.next()) {
+                	//logger.info("We Have A Result Set.");
+                    fullTask.setDocumentNumber(resultset.getInt(1));
+                    fullTask.setTaskType(resultset.getString(2));
+                    tasks.set(i, fullTask);
+                    /*logger.info("Set document number: "+fullTask.getDocumentNumber()+
+                    		" and task_type: "+fullTask.getTaskType()+
+                    		" for task_number: "+fullTask.getTaskNumber());*/
+                }
+                resultset.close();
+                statement.close();
+                if (i % 50 == 0){
+                	long elapsedTime = (System.currentTimeMillis() - queryStart)/1000;
+                	logger.info("after query "+i+"/"+size+ ". Elapsed time: " + elapsedTime +" seconds.");
+                }
+            }
+
+        } catch (Exception e) {
+        	e.printStackTrace();
+        }
+        dataSourceM6.close(statement);
+    }
+	
+	/**
+	 * Queries the DB to find information on ordrs. 
+	 * @param orders
+	 * @param serverFlag - What server is being checked
+	 */
+	public void getOrderInfo (List<OrderObjects> orders, String serverFlag) {
+        PreparedStatement statement = null;
+        ResultSet resultset = null;
+        OrderObjects fullOrders;
+        int size = orders.size();
+        long queryStart = System.currentTimeMillis();
+        logger.info("Preparing and executing " +size+ " scripts.");
+        
+        logger.info("Setting server flag and creating DataSource.");
+        try {
+        	if (serverFlag == "KH"){
+        		dataSourceM6 = new DataSource("KH");
+        		logger.info("Set Server to KH.");
+        	} else if (serverFlag == "INV"){
+        		dataSourceM6 = new DataSource("INV");  
+        		logger.info("Set Server to INV.");      		
+        	} else if (serverFlag == "CON"){
+        		dataSourceM6 = new DataSource("CON");  
+        		logger.info("Set Server to CON.");
+        	} else {
+        		logger.error("Could not relate the serverFlag to a server.");
+        		logger.error("The value being passed is: " +serverFlag);
+
+        		logger.error("Log Reader cannot continue and is exiting.");
+        		System.exit(0);
+        	}
+
+    		logger.info("Attempting to Connect to DB.");
+            connectionM6 = dataSourceM6.getConnection();
+            connectionM6.setAutoCommit(false);
+    		logger.info("Connected to DB.");
+
+    		logger.info("Beginning querying for task information.");
+            
+            for (int i =0; i < orders.size(); i++) {
+            	fullOrders = orders.get(i);
+                statement = connectionM6.prepareStatement(SQL_GET_ORDER_INFO);
+                statement.setString(1, fullOrders.getPON());
+                //logger.info("Creating query with PON: " +fullOrders.getPON());
+                
+                resultset = statement.executeQuery();
+                //logger.info("after query "+i+"/"+size);
+                while (resultset.next()) {
+                	//logger.info("We Have A Result Set.");
+                	fullOrders.setDocumentNumber(resultset.getInt(1));
+                    orders.set(i, fullOrders);
+                    //logger.info("Set document number: "+fullOrders.getDocumentNumber());
+                }
+                resultset.close();
+                statement.close();
+                if (i % 50 == 0){
+                	long elapsedTime = (System.currentTimeMillis() - queryStart)/1000;
+                	logger.info("after query "+i+"/"+size+ ". Elapsed time: " + elapsedTime +" seconds.");
+                }
+                
+            }
+            
+        } catch (Exception e) {
+                        e.printStackTrace();
+        }
+        dataSourceM6.close(statement);
+    }
+	
+	/**
+	 * Prints the PON and other information to the buffer
+	 * @param tasks - full list of tasks with information
+	 */
+	public void outputTaskList(List<TaskObjects> tasks) {
+		logger.info("Printing Final Task List.");
+		for (int i =0; i<tasks.size(); i++){
+			System.out.println("task number: " +tasks.get(i).getTaskNumber()+
+							",document number: " +tasks.get(i).getDocumentNumber()+
+							",task type: " +tasks.get(i).getTaskType()+
+							",count: " + tasks.get(i).getCount());
+		}
+	}
+	
+	/**
+	 * Prints the PON and other information to the buffer
+	 * @param orders - full list of PONs with information
+	 */
+	public void outputOrderList(List<OrderObjects> orders) {
+		logger.info("Printing Final Task List.");
+		for (int i =0; i<orders.size(); i++){
+			System.out.println("PON: " +orders.get(i).getPON()+
+					",document number: " +orders.get(i).getDocumentNumber()+
+					",count: " + orders.get(i).getCount());
+		}
+	}
+
+	/**
+	 * Outputs the tasks and other information to a CSV file
+	 * 
+	 * @param tasks - full list of tasks with information
+	 */
+	public void printTaskListToFile(List<TaskObjects> tasks){
+		long timeStamp = 0;
+		try {
+			timeStamp = System.currentTimeMillis();
+			logger.info("Attempting to write to Output"+timeStamp+".csv");
+			FileWriter outFile = new FileWriter(KEY_FILE_PATH + File.separator + "Output/Output"+timeStamp+".csv");
+			PrintWriter out = new PrintWriter(outFile);
+			out.println("taskNumber,documentNumber,taskType,startTime,endTime,count");
+			for (int i =0; i<tasks.size(); i++){
+				out.println(tasks.get(i).getTaskNumber()+
+						","+tasks.get(i).getDocumentNumber()+
+						","+tasks.get(i).getTaskType()+
+						","+tasks.get(i).getTimeStart()+
+						","+tasks.get(i).getTimeEnd()+
+						","+tasks.get(i).getCount());
+			}
+			out.close();
+	  } catch (IOException e){
+		  logger.error("Failed to write to Output"+timeStamp+".csv");
+		  logger.error("Attempted Directory: " +KEY_FILE_PATH + File.separator + "Output/Output"+timeStamp+".csv");
+		  e.printStackTrace();
+		  logger.error("Log Reader Cannot continue. Exiting.");
+		  System.exit(0);
+	  }
+	}
+    
+	/**
+	 * Outputs the PONs and other information to a CSV file
+	 * 
+	 * @param orders - full list of tasks with information
+	 */
+	public void printOrderListToFile(List<OrderObjects> orders){
+		long timeStamp = 0;
+		try {
+			timeStamp = System.currentTimeMillis();
+			logger.info("Attempting to write to Output"+timeStamp+".csv");
+			FileWriter outFile = new FileWriter(KEY_FILE_PATH + File.separator + "Output/Output"+timeStamp+".csv");
+			PrintWriter out = new PrintWriter(outFile);
+			out.println("PON,documentNumber,startTime,endTime,count");
+			for (int i =0; i<orders.size(); i++){
+				out.println(orders.get(i).getPON()+
+						","+orders.get(i).getDocumentNumber()+
+						","+orders.get(i).getTimeStart()+
+						","+orders.get(i).getTimeEnd()+
+						","+orders.get(i).getCount());
+			}
+			out.close();
+	  } catch (IOException e){
+		  logger.error("Failed to write to Output"+timeStamp+".csv");
+		  logger.error("Attempted Directory: " +KEY_FILE_PATH + File.separator + "Output/Output0.csv");
+		  e.printStackTrace();
+		  logger.error("Log Reader Cannot continue. Exiting.");
+		  System.exit(0);
+	  }
+	  
+	  
+	}
+
+}
