@@ -1,0 +1,71 @@
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+
+public class LogReader{
+  private final static Logger logger = Logger.getLogger(LogReader.class);  
+	private final static String KEY_FILE_PATH = "file.path";
+	
+	//establish variables to hold arguments
+	public String server = null;
+	public String serverType = null;
+	public String analysisType = null;
+	public int logLow = 0;
+	public int logHigh = 0;
+	
+	public String serverFlag = null;
+	public String folderToSearch = null;
+	public ArrayList<String> logFiles = new ArrayList<String>();
+
+	public static void main(String[] args) {
+		logger.info("Log Reader starts...");
+		
+		//establish RunningObject class to validate arguments and create a list of logs
+		RunningObject argVal = new RunningObject();
+		argVal.validateArguments(args);
+		argVal.generateFolder();
+		argVal.createLogList();
+		
+		//Establish logReaderDao class and start doing work processing and analysis
+		LogReaderDao logReaderDao = new LogReaderDao();	
+		
+		//Process flow for TASK analysis
+	  	if (argVal.analysisType.equalsIgnoreCase("task")){
+	  		List<TaskObjects> tasks = new ArrayList<TaskObjects>();
+	  		for (int i = 0; i < argVal.logFiles.size(); i++){
+				logger.info("Log File to Analyze: "+argVal.logFiles.get(i));
+				logger.info(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + argVal.folderToSearch + File.separator +argVal.logFiles.get(i));
+				logReaderDao.processTaskFile(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + argVal.folderToSearch + File.separator + argVal.logFiles.get(i), tasks);
+			}
+			logger.info("Done searching files.");
+			logger.info("Beginning DB Update.");
+			logReaderDao.getTaskInfo(tasks, argVal.serverFlag);
+			logger.info("End DB Update.");
+			logger.info("Printing List to Text.");
+			logReaderDao.printTaskListToFile(tasks);
+ 		}
+
+		//Process flow for ORDER analysis
+ 		else if (argVal.analysisType.equalsIgnoreCase("order")){
+ 			List<OrderObjects> orders = new ArrayList<OrderObjects>();
+ 			for (int i = 0; i < argVal.logFiles.size(); i++){
+ 				logger.info("Log File to Analyze: "+argVal.logFiles.get(i));
+				logger.info(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + argVal.folderToSearch + File.separator +argVal.logFiles.get(i));
+				logReaderDao.processOrderFile(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + argVal.folderToSearch + File.separator + argVal.logFiles.get(i), orders);
+			}
+			logger.info("Done searching files.");
+			logger.info("Beginning DB Update.");
+			logReaderDao.getOrderInfo(orders, argVal.serverFlag);
+			logger.info("End DB Update.");
+			logger.info("Printing List to Text.");
+			logReaderDao.printOrderListToFile(orders);
+	 		} else {
+	 			logger.error("Analysis Type not 'task' or 'order'. LogReader cannot continue.");
+	 			System.exit(0);
+	 		}
+		
+		logger.info("Log Reader is finished!");  
+		}
+}
