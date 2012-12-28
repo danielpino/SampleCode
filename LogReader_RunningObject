@@ -1,0 +1,286 @@
+import java.util.ArrayList;
+
+import org.apache.log4j.Logger;
+import com.fairpoint.om.LogReader;
+
+public class RunningObject {
+  
+  private final static Logger logger = Logger.getLogger(LogReader.class);	
+	
+	//establish variables to hold arguments
+	public String server = null;
+	public String serverType = null;
+	public String analysisType = null;
+	public int logLow = 0;
+	public int logHigh = 0;
+	
+	public String serverFlag = null;
+	public String folderToSearch = null;
+	public ArrayList<String> logFiles = new ArrayList<String>();
+	
+	public RunningObject(){}
+	
+	public void validateArguments(String[] args){
+		
+		//pull the first argument for which server is being analyzed (will be an IP Address)
+		//will be sent as an string (e.g. 172.24.66.20) and used later to create a directory (a6p05)
+		try {
+			server = args[0];
+		//Exception thrown if there is a problem retrieving the argument (no argument was passed)
+		} catch (Exception e){
+			logger.error("Error retrieving first argument for server.");
+			logger.error("Looking for an integer between 25 and 29.");
+			e.printStackTrace();
+				logger.error("LogReader is closing.");
+			System.exit(0);
+		}
+		
+		//pull the second argument for which server type is being analyzed (Event/Wholesale/Retail)
+		//will be sent as a string (Evt/Whl/Rtl) and used later to create a directory (a6p05Evt)
+		try {
+			serverType = args[1];
+		//Exception thrown if there is a problem retrieving the argument (no argument was passed)
+		} catch (Exception e){
+			logger.error("Error retrieving second argument for server type.");
+			logger.error("Looking for 'Evt', 'Whl', or 'Rtl'.");
+			e.printStackTrace();
+				logger.error("LogReader is closing.");
+			System.exit(0);
+		}
+		//validate that the server type being passed is a valid server type (Evt/Whl/Rtl)
+		if (!serverType.equalsIgnoreCase("Evt")&&!serverType.equalsIgnoreCase("Whl")&&!serverType.equalsIgnoreCase("Rtl")){
+				logger.error("Server Type not equal to 'Evt', 'Whl', or 'Rtl'. LogReader cannot continue.");
+				logger.error("Value passed for server type was: " +serverType);
+				logger.error("LogReader is closing.");
+				System.exit(0);
+		}
+		
+		//pull the third argument for what to analyze the logs for (tasks or orders)
+		//will be sent as a string (task/order) and used later to call different methods
+		try {
+			analysisType = args[2];
+		//Exception thrown if there is a problem retrieving the argument (no argument was passed)
+		} catch (Exception e){
+			logger.error("Error retrieving third argument for analysis type.");
+			logger.error("Looking for 'task' or 'order'.");
+			e.printStackTrace();
+				logger.error("LogReader is closing.");
+			System.exit(0);
+		}
+		//validate that the analysis type being passed is a valid analysis type (task/order)
+		if (!analysisType.equalsIgnoreCase("task")&&!analysisType.equalsIgnoreCase("order")){
+				logger.error("Analysis Type not equal to 'task' or 'order'. LogReader cannot continue.");
+				logger.error("Value passed for analysis type was: " +analysisType);
+				logger.error("LogReader is closing.");
+				System.exit(0);
+		}
+	
+		//pull the fourth argument for what to analyze the starting log value
+		//will be sent as an integer (0 through 125) and used later to build a list of log files to analyze
+		try {
+			String logStartString = args[3];
+			try{
+				//convert argument sent to an integer value
+				logLow = Integer.parseInt(logStartString);		
+			//Exception thrown if there is a problem converting to a number		
+			} catch (NumberFormatException nfe){
+				logger.error("Error parsing the fourth argument for starting log value.");
+				logger.error("'" + args[3] + "' does not appear to be an integer.");
+				nfe.printStackTrace();
+	 			logger.error("LogReader is closing.");
+				System.exit(0);
+			}
+		//Exception thrown if there is a problem retrieving the argument (no argument was passed)
+		} catch (Exception e){
+			logger.error("Error retrieving fourth argument for starting log value.");
+			logger.error("Looking for an integer between 0 and 125.");
+			e.printStackTrace();
+				logger.error("LogReader is closing.");
+			System.exit(0);
+		}
+		//validate that the starting log value being passed is a valid log value (between 0 and 125)
+		if (logLow < 0 || logLow > 125){
+				logger.error("Starting log value not between 0 and 125. LogReader cannot continue.");
+				logger.error("Value passed for starting log value was: " +logLow);
+				logger.error("LogReader is closing.");
+				System.exit(0);
+		}
+		
+		//pull the fifth argument for what to analyze the ending log value
+		//will be sent as an integer (0 through 125) and used later to build a list of log files to analyze
+		try {
+			String logStartString = args[4];
+			try{
+				//convert argument sent to an integer value
+				logHigh = Integer.parseInt(logStartString);	
+			//Exception thrown if there is a problem converting to a number
+			} catch (NumberFormatException nfe){
+				logger.error("Error parsing the fifth argument for ending log value.");
+				logger.error("'" + args[4] + "' does not appear to be an integer.");
+				nfe.printStackTrace();
+	 			logger.error("LogReader is closing.");
+				System.exit(0);
+			}
+		//Exception thrown if there is a problem retrieving the argument (no argument was passed)
+		} catch (Exception e){
+			logger.error("Error retrieving fifth argument for ending log value.");
+			logger.error("Looking for an integer between 0 and 125.");
+			e.printStackTrace();
+				logger.error("LogReader is closing.");
+			System.exit(0);
+		}
+		
+		//validate that the ending log value being passed is a valid log value (between 0 and 125)
+		if (logHigh < 0 || logHigh > 125){
+				logger.error("Ending log value not between 0 and 125. LogReader cannot continue.");
+				logger.error("Value passed for ending log value was: " +logLow);
+				logger.error("LogReader is closing.");
+				System.exit(0);
+			//validate that the ending log value being passed is greater than the starting log value
+		} else if (logHigh < logLow){
+				logger.error("Ending log value must be greater than Starting log value. LogReader cannot continue.");
+				logger.error("Value passed for starting log value was: " +logLow);
+				logger.error("Value passed for ending log value was: " +logHigh);
+				logger.error("LogReader is closing.");
+				System.exit(0);
+		}
+		
+		//log final values received from the arguments
+		logger.info("server: " + server);
+		logger.info("server type: " + serverType);
+		logger.info("analysis type: " + analysisType);
+		logger.info("log start value: " + logLow);
+		logger.info("log end value: " + logHigh);
+	}
+
+	public void generateFolder(){
+		logger.info("Generating folder name.");
+		//convert server and server type to appropriate value for the directory
+		
+		//Server is set to Invincible 25 box
+		if (server.equals("172.24.34.25")){
+			serverFlag = "INV";
+			if (serverType.equals("Evt")){
+				folderToSearch = "a6p05Evt"; //If on 25 box and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "a6p05Whl"; //If on 25 box and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "a6p05Rtl"; //If on 25 box and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Invincible .25 box " +
+						"(ipaddress = 172.24.34.25) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to Invincible 26 box
+		} else if (server.equals("172.24.34.26")){
+			serverFlag = "INV";
+			if (serverType.equals("Evt")){
+				folderToSearch = "a6p06Evt"; //If on 26 box and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "a6p06Whl"; //If on 26 box and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "a6p06Rtl"; //If on 26 box and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Invincible .26 box " +
+						"(ipaddress = 172.24.34.26) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to Invincible 27 box
+		} else if (server.equals("172.24.34.27")){
+			serverFlag = "INV";
+			if (serverType.equals("Evt")){
+				folderToSearch = "a6p07Evt"; //If on 27 box and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "a6p07Whl"; //If on 27 box and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "a6p07Rtl"; //If on 27 box and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Invincible .27 box " +
+						"(ipaddress = 172.24.34.27) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to Invincible 28 box
+		} else if (server.equals("172.24.34.28")){
+			serverFlag = "INV";
+			if (serverType.equals("Evt")){
+				folderToSearch = "a6p08Evt"; //If on 28 box and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "a6p08Whl"; //If on 28 box and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "a6p08Rtl"; //If on 28 box and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Invincible .28 box " +
+						"(ipaddress = 172.24.34.28) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to Invincible 29 box
+		} else if (server.equals("172.24.34.29")){
+			serverFlag = "INV";
+			if (serverType.equals("Evt")){
+				folderToSearch = "a6p09Evt"; //If on 29 box and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "a6p09Whl"; //If on 29 box and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "a6p09Rtl"; //If on 29 box and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Invincible .29 box " +
+						"(ipaddress = 172.24.34.29) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to KittyHawk
+		} else if (server.equals("172.24.66.20")){
+			serverFlag = "KH";
+			if (serverType.equals("Evt")){
+				folderToSearch = "Stdout/EventManager"; //If on KittyHawk and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "Stdout/Wholesale"; //If on KittyHawk and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "Stdout/Retail"; //If on KittyHawk and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into KittyHawk " +
+						"(ipaddress = 172.24.66.20) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		//Server is set to Constellation
+		} else if (server.equals("172.24.68.224")){
+			serverFlag = "CON";
+			if (serverType.equals("Evt")){
+				folderToSearch = "Stdout/EventManager"; //If on Constellation and Event server
+			} else if (serverType.equals("Whl")){
+				folderToSearch = "Stdout/Wholesale"; //If on Constellation and Wholesale server
+			} else if (serverType.equals("Rtl")){
+				folderToSearch = "Stdout/Retail"; //If on Constellation and Retail server
+			} else {
+				logger.error("Could not generate the folder name. Looking into Constellation " +
+						"(ipaddress = 172.24.68.224) but couldn't find the server type: " + serverType);
+				System.exit(0);
+			}
+		} else {
+			logger.error("The server IP sent was not found in the IP list.");
+			logger.error("Server value being converted: " +server);
+			System.exit(0);
+		}
+		
+		logger.info("Folder name that will be searched: " +folderToSearch);
+		logger.info("Server Flag set to: " +serverFlag);
+	}
+
+	public void createLogList() {
+		logger.info("Creating list of logs.");
+		
+		for (int i = logHigh; i >= logLow; i--){
+			if (i == 0){
+				logFiles.add("OMLogs.txt");
+			}else {
+				logFiles.add("OMLogs.txt." +i);
+			}
+		}
+		
+		logger.info("Displaying list of all logs that will be analyzed:");
+		for (int i = 0; i < logFiles.size(); i++){
+			logger.info(logFiles.get(i));
+		}
+		
+		logger.info("Found list of logs");
+	}
+}
