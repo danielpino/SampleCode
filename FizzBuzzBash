@@ -1,0 +1,91 @@
+package Code;
+
+public class Main {
+
+  /*
+   * FizzBuzzBash is a simple test script designed to print a list of numbers
+	 * or the text "Fizz", "Buzz", and/or "Bash" if the number is divisible by
+	 * 3, 5, and/or 7 respectively.
+	 */
+
+	public static void main(String[] args) {
+		int num = 0;
+
+		// Parse argument
+		try {
+			num = Integer.parseInt(args[0]);
+		} catch (Exception e) {
+			System.out.println("Bad Argument. Number Expected");
+		}
+
+		// Open Loop
+		for (int i = 1; i <= num; i++) {
+			boolean printNum = true;
+			String msg = "";
+
+			// Run checks
+			boolean fizz = isFizz(i);
+			boolean buzz = isBuzz(i);
+			boolean bash = isBash(i);
+
+			// Create Message
+			if (fizz) {
+				msg += "Fizz";
+				printNum = false;
+			}
+			if (buzz) {
+				msg += "Buzz";
+				printNum = false;
+			}
+			if (bash) {
+				msg += "Bash";
+				printNum = false;
+			}
+
+			// Print message or number
+			if (printNum) {
+				System.out.println(i);
+			} else {
+				System.out.println(msg);
+			}
+
+			// Close Loop
+		}
+
+		/*
+		 * first attempt for (int i = 1; i <= num; i++){ boolean fizz =
+		 * isFizz(i); boolean buzz = isBuzz(i); if (fizz && buzz){
+		 * System.out.println(i + ": FizzBuzz"); } else if (fizz){
+		 * System.out.println(i + ": Fizz"); } else if (buzz){
+		 * System.out.println(i + ": Buzz"); } else { System.out.println(i +
+		 * ": " + i); } }
+		 */
+	}
+
+	private static boolean isFizz(int i) {
+		int rem = i % 3;
+		if (rem == 0) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private static boolean isBuzz(int i) {
+		int rem = i % 5;
+		if (rem == 0) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private static boolean isBash(int i) {
+		int rem = i % 7;
+		if (rem == 0) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
