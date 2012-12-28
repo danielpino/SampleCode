@@ -1,0 +1,85 @@
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+
+public class ProvPlanAnalyzer{
+  private final static Logger logger = Logger.getLogger(ProvPlanAnalyzer.class);	
+	private final static String KEY_FILE_PATH = "file.path";
+	
+	/**
+	 * @param args
+	 */
+
+	public static void main(String[] args) {
+		logger.info("Program starts...");
+		
+		ProvPlanAnalyzerDao provPlanAnalyzerDao = new ProvPlanAnalyzerDao();		
+	  	String driverFile = AppUtil.getProperty(KEY_FILE_PATH) + File.separator + 
+		"logs.txt";
+	  	logger.info("Found driver file");
+	  	
+	  	List<PlanObject> allPlans = new ArrayList<PlanObject>();
+	  	List<MatchingPlans> samePlans = new ArrayList<MatchingPlans>();
+	
+	  	logger.info("Beginning analysis of all provisioning plans");
+	  	provPlanAnalyzerDao.countAllTasks(allPlans);
+	  	provPlanAnalyzerDao.getAllTasks(allPlans);
+	  	provPlanAnalyzerDao.comparePlansIdentical(allPlans, samePlans);
+	  	provPlanAnalyzerDao.printSamePlans(samePlans);
+	  	
+	  	
+	  	
+	  	/*
+	 	try {
+	 		logger.info("driver_file:"+driverFile);
+	 		InputStreamReader reader = new InputStreamReader(new FileInputStream(driverFile));
+	 		BufferedReader in = new BufferedReader(reader);
+	 		
+	 		searchType = in.readLine();
+	
+	 		if (searchType.equalsIgnoreCase("tasks")){
+	 			while ((tempLine = in.readLine()) != null)	{
+					logger.info("Log File to Analyze: "+tempLine);
+					logger.info(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + tempLine);
+					logReaderDao.processTaskFile(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + tempLine, tasks);
+				}
+				logger.info("Done searching files.");
+				logger.info("Beginning DB Update.");
+				logReaderDao.getTaskInfo(tasks);
+				logger.info("End DB Update.");
+				//logger.info("Output List to Buffer.");
+				//logReaderDao.outputTaskList(tasks);
+				logger.info("Printing List to Text.");
+				logReaderDao.printTaskListToFile(tasks, 0);
+	 		}
+	 		
+	 		else if (searchType.equalsIgnoreCase("orders")){
+	 			while ((tempLine = in.readLine()) != null)	{
+					logger.info("Log File to Analyze: "+tempLine);
+					//logger.info(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + tempLine);
+					logReaderDao.processOrderFile(AppUtil.getProperty(KEY_FILE_PATH) + File.separator + tempLine, orders);
+				}
+				logger.info("Done searching files.");
+				logger.info("Beginning DB Update.");
+				logReaderDao.getOrderInfo(orders);
+				logger.info("End DB Update.");
+				//logger.info("Output List to Buffer.");
+				//logReaderDao.outputOrderList(orders);
+				logger.info("Printing List to Text.");
+				logReaderDao.printOrderListToFile(orders, 0);
+	 		}
+	 		
+	 		else {
+	 			logger.info("Search Type not 'tasks' or 'orders'");
+	 		}
+			
+		} catch (Exception e){
+			logger.error("Log Reader failed", e);
+		}		
+	  	 	*/
+		logger.info("Program is finished!");
+		}
+
+}
