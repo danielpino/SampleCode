@@ -1,0 +1,145 @@
+package code;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+
+public class mainObject {
+
+  /**
+   * Problem:
+	 * 
+	 * Do you ever become frustrated with television because you keep seeing the
+	 * same things, recycled over and over again? Well I personally don't care
+	 * about television, but I do sometimes feel that way about numbers.
+	 * 
+	 * Let's say a pair of distinct positive integers (n, m) is recycled if you
+	 * can obtain m by moving some digits from the back of n to the front
+	 * without changing their order. For example, (12345, 34512) is a recycled
+	 * pair since you can obtain 34512 by moving 345 from the end of 12345 to
+	 * the front. Note that n and m must have the same number of digits in order
+	 * to be a recycled pair. Neither n nor m can have leading zeros.
+	 * 
+	 * Given integers A and B with the same number of digits and no leading
+	 * zeros, how many distinct recycled pairs (n, m) are there with 
+	 * A <= n < m <= B?
+	 */
+
+	public static void main(String[] args) {
+		ArrayList<String> outputMessage = new ArrayList<String>();
+		ArrayList<String> inputMessage = new ArrayList<String>();
+		int numCases = 0;
+
+		// count and put inputs into array
+		numCases = readInMessages(inputMessage, numCases);
+
+		// logging block
+		System.out.println("numCases: " + numCases);
+		System.out.println("inputMessage: " + inputMessage.size());
+
+		// loop through array and run analysis method on each
+		for (int i = 0; i < numCases; i++) {
+			outputMessage.add(runAnalysis(inputMessage.get(i)));
+		}
+
+		// loop through analysis array and print
+		for (int i = 0; i < numCases; i++) {
+			/* 
+			 * System.out.println("Case #" + (i + 1) + ": " +
+			 * outputMessage.get(i));
+			 * System.out.println(i+1 +" "+ inputMessage.get(i));
+			 * System.out.println(i+1 +" "+ outputMessage.get(i));
+			 */
+			writeOutResult(outputMessage, numCases);
+		}
+	}
+
+	private static String runAnalysis(String message) {
+		// find length of input and break into the two sections
+		int length = message.length() - 1;
+		String firstSection = message.substring(0, length / 2);
+		String secondSection = message.substring(length / 2 + 1, length + 1);
+		
+		int numRecycled = 0;
+		int lowNum = Integer.parseInt(firstSection);
+		int highNum = Integer.parseInt(secondSection);
+
+		for (int i = lowNum; i <= highNum; i++) {
+
+			// Can it be recycled?
+			if (i > 9) {
+				int numDigits = String.valueOf(i).length();
+				// Recycle it
+				for (int j = 1; j < numDigits; j++) {
+					int tempValue = 0;
+					tempValue = Integer.parseInt(String.valueOf(i)
+							.substring(j, numDigits)
+							.concat(String.valueOf(i).substring(0, j)));
+
+					// Does it fit the lowNum <= i < tempValue <= highNum
+					// pattern?
+					if (lowNum <= i && i < tempValue && tempValue <= highNum) {
+						numRecycled++;
+						/* 
+						 * System.out.println("Recycled Pair Found! "+ lowNum
+						 * +" <= "+ i +" < "+ tempValue +" <= "+ highNum);
+						 */ 
+					}
+				}
+			}
+
+		}
+
+		return String.valueOf(numRecycled);
+	}
+
+	private static int readInMessages(ArrayList<String> inputMessage,
+			int numCases) {
+
+		System.out.println("entered readInMessages");
+
+		// point to input file
+		try {
+			BufferedReader in = new BufferedReader(
+					new FileReader(
+							"C:/Users/Titan/workspace/GoogleCodeJam_RecycledNumbers/src/C-large-practice.in"));
+			// read and store inputs
+			String str;
+			while ((str = in.readLine()) != null) {
+				// System.out.println(str);
+				if (numCases == 0) {
+					numCases = Integer.parseInt(str);
+				} else {
+					inputMessage.add(str);
+				}
+			}
+			in.close();
+		} catch (IOException e) {
+		}
+		return numCases;
+	}
+
+	private static void writeOutResult(ArrayList<String> outputMessage,
+			int numCases) {
+		try {
+			FileWriter fstream = new FileWriter("out.txt");
+			BufferedWriter out = new BufferedWriter(fstream);
+
+			for (int i = 0; i < numCases; i++) {
+				out.write("Case #" + (i + 1) + ": " + outputMessage.get(i));
+				/*
+				 * System.out.println(i+1 +" "+ inputMessage.get(i));
+				 * System.out.println(i+1 +" "+ outputMessage.get(i));
+				 */
+			}
+
+			// Close the output stream
+			out.close();
+		} catch (Exception e) {// Catch exception if any
+			System.err.println("Error: " + e.getMessage());
+		}
+	}
+}
